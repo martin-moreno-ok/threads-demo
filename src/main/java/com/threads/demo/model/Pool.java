@@ -3,20 +3,23 @@ package com.threads.demo.model;
 import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 @NoArgsConstructor
-public class Pool <R extends Resource> {
-
+public class Pool <R> {
     private static final int POOL_SIZE = 10;
     private BlockingQueue<R> pool;
+    private Set<R> managedResources;
 
     public synchronized void open() {
         if(!this.isOpen()){
             this.pool = new ArrayBlockingQueue<>(POOL_SIZE);
+            this.managedResources = new HashSet<>();
         }
     }
 
@@ -39,9 +42,9 @@ public class Pool <R extends Resource> {
 
         boolean resourceAdded = false;
 
-        if (!resource.isManaged()) {
+        if (!managedResources.contains(resource)) {
             this.pool.put(resource);
-            resource.setManaged(true);
+            managedResources.add(resource);
             resourceAdded = true;
         }
 
@@ -52,10 +55,10 @@ public class Pool <R extends Resource> {
 
         boolean resourceRemoved = false;
 
-        if (resource.isManaged()) {
+        if (managedResources.contains(resource)) {
             this.pool.remove(resource);
             resourceRemoved = true;
-            resource.setManaged(false);
+            managedResources.remove(resource);
         }
 
         return resourceRemoved;
@@ -66,12 +69,12 @@ public class Pool <R extends Resource> {
         boolean resourceRemoved = false;
         List<R> poolList = new ArrayList<>();
 
-        if (resource.isManaged()) {
+        if (managedResources.contains(resource)) {
             this.pool.drainTo(poolList);
             poolList.remove(resource);
             this.pool.addAll(poolList);
             resourceRemoved = true;
-            resource.setManaged(false);
+            managedResources.remove(resource);
         }
 
         return resourceRemoved;
@@ -89,9 +92,13 @@ public class Pool <R extends Resource> {
     }
 
     public void release(R resource) throws InterruptedException {
-        if(resource.isManaged()){
+        if(managedResources.contains(resource)){
             this.pool.put(resource);
         }
+    }
+
+    public int size() {
+        return this.pool.size();
     }
 
 }
